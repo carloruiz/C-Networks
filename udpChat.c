@@ -47,18 +47,20 @@ int main(int argc, char **argv) {
             error("Incorrect command line arguments");
     } else
         error("Incorrect command line arguments");
-
+	
+	return 0;
 }
 
 void udpServer(char *port_str)
 {
 	fprintf(stderr, "In server\n\n");
-    int servSock, port, clientlen;
-    struct sockaddr_in servaddr, clntaddr;// tmp;
+    int servSock, port;
+    struct sockaddr_in servaddr, clntaddr; //tmp
     struct hostent *hostp;
-    char *buf;
+    char buf[BUFSIZE];
     char *hostaddrp;
     int n;
+    socklen_t clntlen;
 
     port = atoi(port_str);
 
@@ -78,7 +80,7 @@ void udpServer(char *port_str)
 
 	fprintf(stderr, "server up..LESSGOOO..GET THIS CHAT GOIIN\n");
 
-    clientlen = sizeof(struct sockaddr_in);
+    clntlen = sizeof(struct sockaddr_in);
 
     for ( ; ;) {
 
@@ -87,21 +89,21 @@ void udpServer(char *port_str)
         temp->msg = malloc(BUFSIZE);
         recvfrom(servSock, temp->msg, BUFSIZE etc...
     */
-        buf = malloc(BUFSIZE);
+        //buf = malloc(BUFSIZE);
 		
 		fprintf(stderr, "wating on client\n");
 
         n = recvfrom(servSock, buf, BUFSIZE, 0,
-                        (struct sockaddr *)&clntaddr, NULL);
+                        (struct sockaddr *)&clntaddr, &clntlen);
 
         if (n < 0) {
-            fprintf(stderr, "ERROR on recvfrom()\n");
+            perror("ERROR on recvfrom()");
             continue;
         }
 		
 		fprintf(stderr, "recieved %s from client\n", buf); 
 
-        if (sendto(servSock, "ACK", 4, 0, (struct sockaddr *)&clntaddr, clientlen) < 4) {
+        if (sendto(servSock, "ACK", 4, 0, (struct sockaddr *)&clntaddr, clntlen) < 4) {
 			perror("sending ACK failed\n");
             continue;
         }
@@ -109,7 +111,6 @@ void udpServer(char *port_str)
 		fprintf(stderr, "ACK sent to client\n");
         //buf[BUFSIZE - 1] = '\0';
         //pthread_create(&tid, NULL, serverRequest, temp);
-		free(buf); //remove later
     }
 }
 
@@ -118,9 +119,10 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 	fprintf(stderr, "In client\n\n");
 	fprintf(stderr, "%s\n%s\n%s\n%s\n", uname, servIP, servPort, clntPort);
 
-	int servSock, mySock, port, n, servlen, mylen;
+	int servSock, mySock, port, n;
 	struct sockaddr_in servAddr, myAddr;
 	char buf[BUFSIZE];
+	socklen_t servlen, mylen;
 
 	servlen = mylen =  sizeof(struct sockaddr_in);
 	
@@ -152,12 +154,12 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 	
 	fprintf(stderr, "sending %s to server\n", buf);
 
-	n = sendto(servSock, buf, strlen(buf), 0, (struct sockaddr *)&servAddr, servlen);
+	n = sendto(servSock, buf, strlen(buf) + 1, 0, (struct sockaddr *)&servAddr, servlen);
 	if (n < 0)
 		error("ERROR sending packet to server");
 
 	n = recvfrom(servSock, buf, BUFSIZE, 0,
-							(struct sockaddr *)&servAddr, NULL);
+							(struct sockaddr *)&servAddr, &mylen);
 	if (n < 0)
 		error("ERROR on recvfrom()");
 
