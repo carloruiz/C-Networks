@@ -17,6 +17,7 @@
 
 void udpServer(char *);
 void udpClient(char *, char *, char *, char *);
+int getACK(char *, int, struct sockaddr_in *, socklen_t *);
 
 void error(char *msg) {
     perror(msg);
@@ -170,6 +171,8 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 	if (n < 0)
 		error("ERROR sending packet to server");
 
+
+/*
 	i = 0;
 	while (i++ < 5) {
 		fprintf(stderr, "Waiting for ACK: %d\n", i);
@@ -184,10 +187,33 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 
 	if (strcmp(buf, "ACK") != 0)
 		error("No acknowldgement recieved from server");
-	
+*/
+
+	if (getACK(buf, servSock, &servAddr, &mylen) == 0)
+		die(">>> [Server not responding]\n>>> [Exiting]");
+
 	fprintf(stderr, "connection successful\n");
 
 	exit(1);
 	
 }
+
+int getACK(char *buf, int servSock, struct sockaddr_in *servAddr, socklen_t *len)
+{
+	int i = 0;	
+	
+	while (i++ < 5) {
+		fprintf(stderr, "Waiting for ACK: %d\n", i);
+		n = recvfrom(servSock, buf, BUFSIZE, 0,
+							(struct sockaddr *)servAddr, len);
+		if (n > 0 && strcmp(buf, "ACK") == 0)
+			return 1;
+	}
+	return 0;
+}
+
+
+
+
+
 
