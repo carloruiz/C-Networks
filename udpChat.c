@@ -1,4 +1,4 @@
-
+#include <time.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -21,6 +21,11 @@ void udpClient(char *, char *, char *, char *);
 void error(char *msg) {
     perror(msg);
     exit(1);
+}
+
+void die(char *msg) {
+	fprintf(stderr, "%s\n", msg);
+	exit(1);
 }
 
 struct servthread_args {
@@ -95,14 +100,14 @@ void udpServer(char *port_str)
 
         n = recvfrom(servSock, buf, BUFSIZE, 0,
                         (struct sockaddr *)&clntaddr, &clntlen);
-
+		
         if (n < 0) {
             perror("ERROR on recvfrom()");
             continue;
         }
 		
 		fprintf(stderr, "recieved %s from client\n", buf); 
-
+			
         if (sendto(servSock, "ACK", 4, 0, (struct sockaddr *)&clntaddr, clntlen) < 4) {
 			perror("sending ACK failed\n");
             continue;
@@ -119,7 +124,8 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 	fprintf(stderr, "In client\n\n");
 	fprintf(stderr, "%s\n%s\n%s\n%s\n", uname, servIP, servPort, clntPort);
 
-	int servSock, mySock, port, n;
+	
+	int servSock, mySock, port, n,i;
 	struct sockaddr_in servAddr, myAddr;
 	char buf[BUFSIZE];
 	socklen_t servlen, mylen;
@@ -149,24 +155,37 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 	if (inet_aton(servIP, &servAddr.sin_addr) == 0)
 		error("inet_aton() failed");
 
+	//set servSock time out to 500 millies
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 500 * 1000;
+	setsockopt(servSock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
 
 	snprintf(buf, BUFSIZE, "%s|%s", uname, clntPort);
 	
 	fprintf(stderr, "sending %s to server\n", buf);
 
+
 	n = sendto(servSock, buf, strlen(buf) + 1, 0, (struct sockaddr *)&servAddr, servlen);
 	if (n < 0)
 		error("ERROR sending packet to server");
 
-	n = recvfrom(servSock, buf, BUFSIZE, 0,
+	i = 0;
+	while (i++ < 5) {
+		fprintf(stderr, "Waiting for ACK: %d\n", i);
+		n = recvfrom(servSock, buf, BUFSIZE, 0,
 							(struct sockaddr *)&servAddr, &mylen);
-	if (n < 0)
-		error("ERROR on recvfrom()");
+		if (n > 0)
+			break;
+	}
+
+	if (i == 6)
+		die(">>> [Server not responding]\n>>> [Exiting]");
 
 	if (strcmp(buf, "ACK") != 0)
 		error("No acknowldgement recieved from server");
 	
-	fprintf(stderr, "connection successful");
+	fprintf(stderr, "connection successful\n");
 
 	exit(1);
 	
