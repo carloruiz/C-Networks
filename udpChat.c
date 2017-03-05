@@ -53,7 +53,7 @@ void die(char *buf) {
 void *serverRequest(void *ptr)
 {
 	int len;
-	char *buf;
+	char *buf, *uname;
 	struct sockaddr_in *clntaddr;
 	struct servthread_args *args;
 
@@ -71,10 +71,29 @@ void *serverRequest(void *ptr)
 	// [STORE] messages
 
 	if (strstr(buf, "[INIT]") == buf) {
-		char *uname = strstr(buf, "]") + 1;
+		uname = strstr(buf, "]") + 1;
 		addEntry(uname, args->clntaddr);
 		broadcastTABLE();
 	}	
+	else if (strstr(buf, "[DEREG]") == buf) {
+		uname = strstr(buf, "]") + 1;
+		int pos = findEntry(uname);
+		TABLE[pos].status = 0;
+		broadcastTABLE();
+	}
+	else if (strstr(buf, "[REG]") == buf) {
+		uname = strstr(buf, "]") + 1;
+		int pos = findEntry(uname);
+		TABLE[pos].status = 1;
+		broadcastTABLE();
+		//send stored messages
+	}
+	else if (strstr(buf, "[STORE]") == buf) {
+		
+	}
+	else {
+		fprintf(stderr, "Unidentified tag recieved\n");
+	}
 
 	free(args->buf);
 	free(args->clntaddr);
@@ -181,25 +200,27 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 	// server Address
 	memset(&servAddr, 0, sizeof(servAddr));
 	servAddr.sin_family = AF_INET;
-	servAddr.sin_port = htons(atoi(servPort));
+	servAddr.sin_port = htons((unsigned short)atoi(servPort));
 	if (inet_aton(servIP, &servAddr.sin_addr) == 0)
 		error("inet_aton() failed");
 
+    
 	// my Address
 	memset(&myAddr, 0, sizeof(myAddr));
 	myAddr.sin_family = AF_INET;
-	myAddr.sin_port = htons(atoi(clntPort));
+	servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	myAddr.sin_port = htons((unsigned short)atoi(clntPort));
 	if (inet_aton(servIP, &myAddr.sin_addr) == 0)
 		error("inet_aton() failed");
 
 
-	// nn blocking Socket will test server/peer's status
+	// non blocking Socket will test server/peer's status
 	if ((mySock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 		error("socket() failed");
 	
 	setsockopt(mySock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(int));
 	if (bind(mySock, (struct sockaddr *)&myAddr, sizeof(myAddr)) < 0)
-		error("ERROR on bind()");
+		error("ERROR on bind() 1");
 
 	// Blocking socket that will wait for changes in Client Table
 	if ((servSock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
@@ -207,7 +228,7 @@ void udpClient(char *uname, char *servIP, char *servPort, char *clntPort)
 
 	setsockopt(servSock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(int));
 	if (bind(servSock, (struct sockaddr *)&myAddr, sizeof(myAddr)) < 0)
-		error("ERROR on bind()");
+		error("ERROR on bind() 2");
 
 	// creating socket that times out..To be used to test clients
 	// and server status
@@ -302,6 +323,17 @@ void broadcastTABLE(void)
 			}
 		}
 	}		
+}
+
+int findEntry(char *name)
+{
+	int i = 0;
+	while (i < currSz) {
+		if (strcmp(TABLE.uname, name) == 0)
+			return i;
+		i++;
+	}
+	return -1;
 }
 
 
